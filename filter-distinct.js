@@ -58,7 +58,7 @@ var createFilterDistinct = function (options) {
         db = levelup({ db: memdown });
     }
 
-	return function (data, callback) {
+	return function (data) {
 		//remove properties that have value 'undefined';
 		data = JSON.parse(JSON.stringify(data));
 
@@ -96,16 +96,16 @@ var createFilterDistinct = function (options) {
 
                 if (batchOperations.length === 0) {
                     //all properties and features were already covered, report as not distinct
-                    callback(null, false);
-                    return;
+                    return false;
                 }
                 return q.ninvoke(db, 'batch', batchOperations)
                 .then(function () {
                     //some properties or features were not found, report as distinct
-                    callback(null, true)
+                    return true
                 })
             })
-            .catch(callback)
+
+        return promiseChain;
 	};
 }
 
