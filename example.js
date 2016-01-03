@@ -52,13 +52,11 @@ request("http://www.hoonlir.com/logs/access.log")
     //split stream to break on newlines
     .pipe(es.split())
     .on('data', function () {ins++;})
-    .on('end', function () {console.log('end1')})
     .pipe(es.mapSync(filterSkipEmptyLines))
     .pipe(es.map(function(line, callback) {
         new Logparser().parseLine(line, '', callback)})
     )
     .pipe(es.mapSync(extractData))
-    .on('end', function () {console.log('end3,5')})
     .pipe(es.map(function (data, callback) {
         filterDistinct(data, function (error, distinct) {
             if (error) {
@@ -67,24 +65,16 @@ request("http://www.hoonlir.com/logs/access.log")
             }
 
             if (distinct) {
+                //distinct, keep
                 callback(null, data);
                 return;
             }
-            //skip
+            //not distinct, skip
             callback();
         })
     }))
-    .on('error', console.log)
-    .on('end', function () {console.log('end4')})
-    .pipe(
-        es.mapSync(function(data) {
-            outs++;
-            return data;
-        })
-    )
-    .on('end', function () {console.log('end5')})
     .pipe(es.stringify())
-    .on('end', function () {console.log('end6')})
+    .on('data', function () {outs++;})
     .on('end', function (err) {
         console.log('DONE!');
         console.log('in:' + ins+' out:' + outs);
