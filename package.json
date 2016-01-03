@@ -1,0 +1,26 @@
+{
+  "name": "samplecollector",
+  "version": "0.0.1",
+  "description": "collect unique samples",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "author": "Markko Paas",
+  "license": "ISC",
+  "dependencies": {
+    "event-stream": "^3.3.2",
+    "flat": "^1.6.0",
+    "leveldown": "^1.4.3",
+    "levelup": "^1.3.1",
+    "lodash": "^3.10.1",
+    "memdown": "^1.1.0",
+    "q": "^1.4.1",
+    "request": "^2.67.0",
+    "serialize": "^0.1.3",
+    "var-type": "^1.0.0"
+  },
+  "devDependencies": {
+    "logagent-js": "^1.1.17"
+  }
+}

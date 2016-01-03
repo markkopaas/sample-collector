@@ -1,0 +1,43 @@
+samplecollector
+
+crawl-reduce the source
+use feature definition
+store edge cases to key-value store.
+
+
+
+object stream api
+for each object we analyze if it adds anything to the suite, using features.
+
+
+standard for each field:
+null
+0
+''
+undefined
+sign
+round log10 length string
+round log10 number
+type
+
+feature can define field dependecies and special values for each field (callback)
+
+search by index
+
+
+reject if all features (each field is a default feature) have index match
+
+
+
+123
+223
+241
+121-rej
+
+stream
+.pipe(obfuscator)
+.pipe(samplecollector)
+.pipe - found samples
+
+
+samplecollector
