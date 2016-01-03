@@ -1,25 +1,27 @@
-var _ = require('lodash');
-var q = require('q');
+var _       = require('lodash');
+var q       = require('q');
+var extend  = require('util')._extend;
 var flatten = require('flat');
-var extend = require('util')._extend;
 var levelup = require('levelup');
+var varType = require('var-type');
+
 var classify = require('./classify');
+
+var Queue = require('promise-queue');
+Queue.configure(q.Promise);
+var maxConcurrent = 1;
+var queue = new Queue(maxConcurrent);
 
 var db;
 
-//seed the chain
-var promiseChain = q.resolve();
-
-var storage = {};
-
 function classifyProperties (data) {
-	if(Array.isArray(data)) {
+	if(varType(data, 'Array')) {
 		return data.map(function(dataItem) {
 				return classifyProperties(data)
 			}).concat(classify(dataItem));
 	};
 
-	if (Object.prototype.toString.call(data) === '[object Object]') {
+	if (varType(data, 'Object')) {
 		return extend(
 			_.mapValues(data, function(dataItem) {
 				return classifyProperties(dataItem)
@@ -33,12 +35,47 @@ function classifyProperties (data) {
 
 function classifyFeatures (propertyClasses, features) {
 	return _.mapValues(features, function (featureProperties) {
-		var dependencyClass = featureProperties.map(function (propertyPath) {
-				return _.get(propertyClasses,propertyPath);
+		var featureClass = featureProperties.map(function (propertyPath) {
+				return _.get(propertyClasses, propertyPath);
 			});
-
-		return JSON.stringify(dependencyClass);
+        return JSON.stringify(featureClass);
 	});
+}
+
+//perform set of lookups and create keys for failed lookups
+//resolve with true if any of the lookups from the set was failing, false if all lookups exist
+function findOrCreate(db, group, lookupSet) {
+    var lookupPromises = [];
+    var lookupPromiseKeys = [];
+
+    Object.keys(lookupSet).forEach(function (key) {
+        var lookupKey = ('group:' + group + ', key: '+ key + ', class:' + lookupSet[key]);
+
+        lookupPromises.push(q.ninvoke(db, 'get', lookupKey));
+        lookupPromiseKeys.push(lookupKey);
+    });
+
+    return q.allSettled(lookupPromises)
+        .then(function (results) {
+            var batchOperations = [];
+
+            results.forEach(function (result, index) {
+                if (result.state === "rejected") {
+                    batchOperations.push({type:'put', key: lookupPromiseKeys[index], value:true});
+                }
+            });
+
+            if (batchOperations.length === 0) {
+                //bone of the properties or features were distinct, report as not distinct
+                return false
+            }
+
+            return q.ninvoke(db, 'batch', batchOperations)
+            .then(function () {
+                //some properties or features were distinct, report as distinct
+                return true;
+            })
+        });
 }
 
 var createFilterDistinct = function (options) {
@@ -53,12 +90,12 @@ var createFilterDistinct = function (options) {
         db = levelup('./levelUpDistinct');
     } else {
         var memdown = require('memdown');
-        memdown.clearGlobalStore(true);
+        memdown.clearGlobalStore();
 
         db = levelup({ db: memdown });
     }
 
-	return function (data) {
+	return function (data, callback) {
 		//remove properties that have value 'undefined';
 		data = JSON.parse(JSON.stringify(data));
 
@@ -66,47 +103,19 @@ var createFilterDistinct = function (options) {
 	  	var extractedProperties = propertyExtractor(data);
 	  	var propertyClasses = classifyProperties(extractedProperties);
 	  	var featureClasses = classifyFeatures(propertyClasses, features);
-	  	var lookupKeys = flatten({
+	  	var lookupSet = flatten({
 	  			properties: propertyClasses,
 	  			features: featureClasses
 	  	});
 
-        var lookupPromises = [];
-        var lookupPromiseKeys = [];
-
-	  	Object.keys(lookupKeys).forEach(function (key) {
-	  		var lookupKey = ('group:' + group + ', key: '+ key + ', class:' + lookupKeys[key]);
-
-            lookupPromises.push(q.ninvoke(db, 'get', lookupKey));
-            lookupPromiseKeys.push(lookupKey);
-        });
-
-        promiseChain = promiseChain
-            .then(function () {
-                return q.allSettled(lookupPromises);
-            })
-            .then(function (results) {
-                var batchOperations = [];
-
-                results.forEach(function (result, index) {
-                    if (result.state === "rejected") {
-                        batchOperations.push({type:'put', key: lookupPromiseKeys[index], value:true});
-                    }
-                });
-
-                if (batchOperations.length === 0) {
-                    //all properties and features were already covered, report as not distinct
-                    return false;
-                }
-                return q.ninvoke(db, 'batch', batchOperations)
-                .then(function () {
-                    //some properties or features were not found, report as distinct
-                    return true
-                })
-            })
-
-        return promiseChain;
-	};
+        queue.add(function () {
+            return findOrCreate(db, group, lookupSet)
+        })
+        .then(function(distinct) {
+            callback(null, distinct)
+        })
+        .catch(callback);
+    };
 }
 
 module.exports.create = createFilterDistinct;

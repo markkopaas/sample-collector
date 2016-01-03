@@ -10,7 +10,7 @@ var parseLine = serialize(logParser.parseLine.bind(logParser));
 
 var filterDistinctFactory 	= require('./filter-distinct');
 var filterDistinctOptions = {
-        preserve: true,
+        preserve: false,
         //select properties that are used for determining distinct records
         propertyExtractor: function (data) {
             return {
@@ -35,11 +35,11 @@ var outs=0;
 function extractData (input) {
     if (varType(input, 'Object')) {
         return {
-            method: input.method,
-            status_code: input.status_code,
-            path: input.path,
-            file:   input.path && input.path.replace(url.parse(input.path).search,''),
-            query:  input.path && url.parse(input.path, true).query
+            method:         input.method,
+            status_code:    input.status_code,
+            path:           input.path,
+            file:           input.path && input.path.replace(url.parse(input.path).search,''),
+            query:          input.path && url.parse(input.path, true).query
         }
     }
 }
@@ -50,8 +50,8 @@ function filterSkipEmptyLines(line) {
     }
 }
 
-// request("http://redlug.com/logs/access.log")
-request("http://www.hoonlir.com/logs/access.log")
+var dataStream = request("http://redlug.com/logs/access.log")
+//request("http://www.hoonlir.com/logs/access.log")
     //split stream to break on newlines
     .pipe(es.split())
     .on('data', function () {ins++;})
@@ -60,18 +60,27 @@ request("http://www.hoonlir.com/logs/access.log")
         parseLine(line, '', callback)})
     )
     .pipe(es.mapSync(extractData))
-    .pipe(es.map(function (data, callback) {
-        filterDistinct(data)
-        .then(function (distinct) {
+
+//alternative test dataStream - duplicate data rows
+// var dataStream = es.readArray([{"method":"GET","status_code":200,"path":"/logs/access.log","file":"/logs/access.log","query":{}},
+// {"method":"GET","status_code":200,"path":"/logs/access.log","file":"/logs/access.log","query":{}}]);
+
+dataStream.pipe(es.map(
+    function (data, callback) {
+        filterDistinct(data, function (error, distinct) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
             if (distinct) {
-                //distinct, keep
+                // data distinct, keep
                 callback(null, data);
                 return;
             }
             //not distinct, skip
             callback();
-        })
-        .catch(callback);
+        });
     }))
     .pipe(es.stringify())
     .on('data', function () {outs++;})
