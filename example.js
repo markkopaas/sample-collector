@@ -67,20 +67,17 @@ var dataStream = request("http://redlug.com/logs/access.log")
 
 dataStream.pipe(es.map(
     function (data, callback) {
-        filterDistinct(data, function (error, distinct) {
-            if (error) {
-                callback(error);
-                return;
-            }
-
+        filterDistinct(data)
+        .then(function (distinct) {
             if (distinct) {
-                // data distinct, keep
+                // data is distinct, keep
                 callback(null, data);
                 return;
             }
             //not distinct, skip
             callback();
-        });
+        })
+        .catch(callback);
     }))
     .pipe(es.stringify())
     .on('data', function () {outs++;})
