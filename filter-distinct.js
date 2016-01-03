@@ -4,14 +4,11 @@ var flatten = require('flat');
 var extend = require('util')._extend;
 var levelup = require('levelup');
 var crypto = require('crypto');
-var es = require('event-stream');
-var memdown = require('memdown');
-// var db = levelup('./mydb');
-var db;// = levelup({ db: memdown });
-var promiseChain = q.resolve(true);
-// db = levelup('./levelUpDistinct');
 
-require('memdown').clearGlobalStore(true);
+var db;
+
+//seed the chain
+var promiseChain = q.resolve();
 
 var storage = {};
 
@@ -93,6 +90,9 @@ var createFilterDistinct = function (options) {
     if (options && options.preserve) {
         db = levelup('./levelUpDistinct');
     } else {
+        var memdown = require('memdown');
+        memdown.clearGlobalStore(true);
+
         db = levelup({ db: memdown });
     }
 

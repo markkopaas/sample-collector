@@ -1,15 +1,8 @@
-var createFilterDistinct 	= require('./filter-distinct').create;
-var apacheLogParser	= require('./apache-log-parser');
+var filterDistinctFactory 	= require('./filter-distinct');
 var es 				= require('event-stream');
 var request 		= require('request');
 var url             = require('url');
 var Logparser       = require('logagent-js');
-// var logParser       = new Logparser();
-// var serialize = require('serialize');
-var q               = require('q');
-
-var chain = q.resolve();
-
 
 var filterDistinctOptions = {
     preserve: false,
@@ -29,7 +22,7 @@ var filterDistinctOptions = {
     }
 };
 
-var filterDistinct = createFilterDistinct(filterDistinctOptions);
+var filterDistinct = filterDistinctFactory.create(filterDistinctOptions);
 
 var ins=0;
 var outs=0;
