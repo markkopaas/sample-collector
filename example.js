@@ -14,7 +14,7 @@ var filterDistinctOptions = {
 	},
 
 	//define sets of properties where it is important to track all combinations
-	features: {x:['query.author', 'query.author']},
+	features: {x:['query.osc', 'query.author']},
 
 	//each group will have its own reduced set of data
 	groupExtractor: function (data) {
@@ -37,7 +37,7 @@ function extractData(input) {
     }
 }
 
-function filterLines(line) {
+function filterSkipEmptyLines(line) {
     if(line) {
         return line
     }
@@ -53,23 +53,10 @@ request("http://www.hoonlir.com/logs/access.log")
     .pipe(es.split())
     .on('data', function () {ins++;})
     .on('end', function () {console.log('end1')})
-    // .pipe(es.mapSync(filterLines))
-    .pipe(es.through(
-        function write(data) {
-            if(data) {
-                this.emit('data', data)
-            }
-            //this.pause()
-        },
-        function end () { //optional
-            this.emit('end')
-        }).on('error', function (err) {console.log(err)}).on('end', function () {console.log('end2')}))
-.on('end', function () {console.log('end2,5')})
+    .pipe(es.mapSync(filterSkipEmptyLines))
     .pipe(es.map(function(line, callback) {
         new Logparser().parseLine(line, '', callback)})
     )
-    .on('end', function () {console.log('end3')})
-
     .pipe(es.mapSync(extractData))
     .on('end', function () {console.log('end3,5')})
     .pipe(es.map(function (data, callback) {
@@ -80,11 +67,9 @@ request("http://www.hoonlir.com/logs/access.log")
             }
 
             if (distinct) {
-                console.log('distinct')
                 callback(null, data);
                 return;
             }
-            console.log('not distinct')
             //skip
             callback();
         })
